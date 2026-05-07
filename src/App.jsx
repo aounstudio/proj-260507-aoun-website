@@ -111,6 +111,34 @@ const stagger = {
   show: { transition: { staggerChildren: 0.08 } },
 };
 
+const homeReveal = {
+  hidden: { opacity: 0, y: 14, filter: "blur(10px)" },
+  show: (delay = 0) => ({
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    transition: {
+      delay,
+      duration: 0.85,
+      ease: [0.16, 1, 0.3, 1],
+    },
+  }),
+};
+
+const chromeReveal = {
+  hidden: { opacity: 0, y: -6, filter: "blur(6px)" },
+  show: (delay = 0) => ({
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    transition: {
+      delay,
+      duration: 0.48,
+      ease: [0.16, 1, 0.3, 1],
+    },
+  }),
+};
+
 function getCurrentRoute() {
   if (typeof window === "undefined") return "home";
   return window.location.hash.replace("#", "") || "home";
@@ -125,19 +153,19 @@ function useHashRoute() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
-const go = useCallback((id) => {
-  if (typeof window === "undefined") return;
+  const go = useCallback((id) => {
+    if (typeof window === "undefined") return;
 
-  const currentRoute = getCurrentRoute();
+    const currentRoute = getCurrentRoute();
 
-  if (currentRoute === id) {
+    if (currentRoute === id) {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      return;
+    }
+
+    window.location.hash = id === "home" ? "" : id;
     window.scrollTo({ top: 0, behavior: "auto" });
-    return;
-  }
-
-  window.location.hash = id === "home" ? "" : id;
-  window.scrollTo({ top: 0, behavior: "auto" });
-}, []);
+  }, []);
 
   return { route, go };
 }
@@ -209,8 +237,14 @@ function PageShell({ children, pageKey }) {
     setPages((currentPages) => {
       const currentPage = currentPages[currentPages.length - 1];
 
-      if (!currentPage || currentPage.key === pageKey) {
+      if (!currentPage) {
         return currentPages;
+      }
+
+      if (currentPage.key === pageKey) {
+        return currentPages.map((page, index) =>
+          index === currentPages.length - 1 ? { ...page, children } : page,
+        );
       }
 
       return [
@@ -379,7 +413,7 @@ function AounLogo({ tone = "light", className = "" }) {
   );
 }
 
-function Preloader() {
+function Preloader({ onComplete }) {
   const [done, setDone] = useState(false);
   const [count, setCount] = useState(0);
 
@@ -410,7 +444,7 @@ function Preloader() {
   }, []);
 
   return (
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={onComplete}>
       {!done && (
         <motion.div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-black text-[#d8d8d2]"
@@ -434,21 +468,33 @@ function Preloader() {
   );
 }
 
-function Header({ route, go }) {
+function Header({ route, go, loadReady }) {
+  const revealState = loadReady ? "show" : "hidden";
+
   return (
     <>
-      <header className="fixed left-0 right-0 top-0 z-50 mix-blend-difference">
+      <motion.header
+        initial="hidden"
+        animate={revealState}
+        className="fixed left-0 right-0 top-0 z-50 mix-blend-difference"
+      >
         <div className="flex items-start justify-between px-7 py-7 text-[#f0f0eb]">
-          <button
+          <motion.button
             type="button"
             onClick={() => go("home")}
             aria-label="AOUN Home"
             className="pt-[1px]"
+            variants={chromeReveal}
+            custom={0.82}
           >
             <AounLogo tone="light" className="h-[10px] w-auto" />
-          </button>
+          </motion.button>
 
-          <nav className={cx("flex gap-8 text-[#f0f0eb]", navClass)}>
+          <motion.nav
+            variants={chromeReveal}
+            custom={0.96}
+            className={cx("flex gap-8 text-[#f0f0eb]", navClass)}
+          >
             {NAV.map((item) => (
               <button
                 type="button"
@@ -462,16 +508,16 @@ function Header({ route, go }) {
                 {item.label}
               </button>
             ))}
-          </nav>
+          </motion.nav>
         </div>
-      </header>
+      </motion.header>
 
-      <SocialLinks route={route} />
+      <SocialLinks route={route} loadReady={loadReady} />
     </>
   );
 }
 
-function SocialLinks({ route }) {
+function SocialLinks({ route, loadReady }) {
   const { scrollYProgress } = useScroll();
   const opacity = useTransform(
     scrollYProgress,
@@ -486,29 +532,34 @@ function SocialLinks({ route }) {
 
   return (
     <motion.div
-      style={{ opacity, y }}
+      initial="hidden"
+      animate={loadReady ? "show" : "hidden"}
+      variants={chromeReveal}
+      custom={1.1}
       className={cx(
-        "fixed bottom-7 right-7 z-40 hidden gap-5 text-[#f0f0eb] mix-blend-difference md:flex",
+        "fixed bottom-7 right-7 z-40 hidden text-[#f0f0eb] mix-blend-difference md:block",
         navClass,
       )}
     >
-      <a
-        href="https://instagram.com"
-        target="_blank"
-        rel="noreferrer"
-        className="transition-opacity hover:opacity-50"
-      >
-        INSTAGRAM
-      </a>
-      <span>/</span>
-      <a
-        href="https://linkedin.com"
-        target="_blank"
-        rel="noreferrer"
-        className="transition-opacity hover:opacity-50"
-      >
-        LINKEDIN
-      </a>
+      <motion.div style={{ opacity, y }} className="flex gap-5">
+        <a
+          href="https://instagram.com"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-opacity hover:opacity-50"
+        >
+          INSTAGRAM
+        </a>
+        <span>/</span>
+        <a
+          href="https://linkedin.com"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-opacity hover:opacity-50"
+        >
+          LINKEDIN
+        </a>
+      </motion.div>
     </motion.div>
   );
 }
@@ -552,19 +603,20 @@ function ParallaxMedia({ src, alt = "", className = "" }) {
   );
 }
 
-function Home({ go }) {
+function Home({ go, loadReady }) {
   return (
     <div className="bg-black text-[#d8d8d2]">
       <section className="relative flex min-h-screen items-center justify-center px-7 py-24">
         <motion.div
           initial="hidden"
-          animate="show"
+          animate={loadReady ? "show" : "hidden"}
           variants={stagger}
           className="relative z-10 text-center"
         >
           <motion.h1
             data-page-reveal
-            variants={fadeUp}
+            variants={homeReveal}
+            custom={0}
             className={cx(
               "mx-auto mb-6 max-w-[18ch] text-[38px] sm:max-w-[20ch] md:max-w-[22ch] md:text-[58px]",
               title,
@@ -576,8 +628,9 @@ function Home({ go }) {
 
           <motion.p
             data-page-reveal
-            variants={fadeUp}
-            className={cx("mx-auto max-w-[42ch] sm:max-w-[48ch] text-[#a6a59f]", small)}
+            variants={homeReveal}
+            custom={0.26}
+            className={cx("mx-auto max-w-[34ch] text-[#a6a59f]", small)}
           >
             FOR FOUNDERS AND COMPANIES WHO REFUSE TO STAY UNDERVALUED.
           </motion.p>
@@ -585,9 +638,10 @@ function Home({ go }) {
 
         <motion.div
           data-page-reveal
-          variants={fadeUp}
+          variants={homeReveal}
+          custom={0.54}
           initial="hidden"
-          animate="show"
+          animate={loadReady ? "show" : "hidden"}
           className="absolute bottom-8 left-7 max-w-[40ch] text-[#8f8e88]"
         >
           <p className={cx(small, "uppercase tracking-[0.12em] leading-[1.38]")}>
@@ -1093,7 +1147,13 @@ function Build({ go }) {
           The guided brand build.
         </p>
 
-        <p className={cx("max-w-[34ch] text-[#69665f] md:col-start-3", small, "uppercase")}>
+        <p
+          className={cx(
+            "max-w-[34ch] text-[#69665f] md:col-start-3",
+            small,
+            "uppercase",
+          )}
+        >
           FOR COMPANIES, PRODUCTS AND CONCEPTS THAT DO NOT SIMPLY NEED BETTER
           DESIGN. THEY NEED STRONGER EFFECT.
         </p>
@@ -1227,7 +1287,13 @@ function Works({ go }) {
           Not a gallery. Interventions.
         </p>
 
-        <p className={cx("max-w-[34ch] text-[#69665f] md:col-start-3", small, "uppercase")}>
+        <p
+          className={cx(
+            "max-w-[34ch] text-[#69665f] md:col-start-3",
+            small,
+            "uppercase",
+          )}
+        >
           AOUN SHOWS SHIFTS IN PERCEPTION, VALUE AND EFFECT.
         </p>
 
@@ -1252,7 +1318,13 @@ function Studio({ go }) {
           A leading instance.
         </p>
 
-        <p className={cx("max-w-[34ch] text-[#69665f] md:col-start-3", small, "uppercase")}>
+        <p
+          className={cx(
+            "max-w-[34ch] text-[#69665f] md:col-start-3",
+            small,
+            "uppercase",
+          )}
+        >
           FOR VALUE, TASTE AND EFFECT.
         </p>
 
@@ -1308,7 +1380,9 @@ function Apply() {
   const isLast = step === formSteps.length - 1;
 
   const handleNext = () => {
-    if (!isLast) setStep((current) => Math.min(current + 1, formSteps.length - 1));
+    if (!isLast) {
+      setStep((current) => Math.min(current + 1, formSteps.length - 1));
+    }
   };
 
   const handleBack = () => {
@@ -1322,7 +1396,13 @@ function Apply() {
           Show us what you are building.
         </p>
 
-        <p className={cx("max-w-[34ch] text-[#69665f] md:col-start-3", small, "uppercase")}>
+        <p
+          className={cx(
+            "max-w-[34ch] text-[#69665f] md:col-start-3",
+            small,
+            "uppercase",
+          )}
+        >
           NOT WHAT YOU ARE IMAGINING.
         </p>
       </PageHero>
@@ -1352,7 +1432,12 @@ function Apply() {
                 </span>
 
                 {step === formSteps.length - 1 ? (
-                  <select className={cx("w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none", small)}>
+                  <select
+                    className={cx(
+                      "w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none",
+                      small,
+                    )}
+                  >
                     <option>10k–20k</option>
                     <option>20k–40k</option>
                     <option>40k–75k</option>
@@ -1361,10 +1446,18 @@ function Apply() {
                 ) : step > 2 ? (
                   <textarea
                     rows={4}
-                    className={cx("w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none", small)}
+                    className={cx(
+                      "w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none",
+                      small,
+                    )}
                   />
                 ) : (
-                  <input className={cx("w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none", small)} />
+                  <input
+                    className={cx(
+                      "w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none",
+                      small,
+                    )}
+                  />
                 )}
               </label>
             </motion.div>
@@ -1382,7 +1475,10 @@ function Apply() {
 
             <button
               type="button"
-              className={cx("rounded-full bg-[#2b2a27] px-5 py-3 text-[#e8e6df]", micro)}
+              className={cx(
+                "rounded-full bg-[#2b2a27] px-5 py-3 text-[#e8e6df]",
+                micro,
+              )}
               onClick={handleNext}
             >
               {isLast ? "SUBMIT" : "NEXT"}
@@ -1396,6 +1492,8 @@ function Apply() {
 
 export default function AounWebsitePrototype() {
   const { route, go } = useHashRoute();
+  const [loadReady, setLoadReady] = useState(false);
+
   useHeavyScroll(route);
 
   const page = useMemo(() => {
@@ -1409,9 +1507,9 @@ export default function AounWebsitePrototype() {
       case "apply":
         return <Apply />;
       default:
-        return <Home go={go} />;
+        return <Home go={go} loadReady={loadReady} />;
     }
-  }, [route, go]);
+  }, [route, go, loadReady]);
 
   return (
     <div className="min-h-screen bg-black text-black antialiased selection:bg-black selection:text-[#e8e6df]">
@@ -1431,8 +1529,8 @@ export default function AounWebsitePrototype() {
         select option { background: ${PAPER_SOFT}; color: ${PAPER_TEXT}; }
       `}</style>
 
-      <Preloader />
-      <Header route={route} go={go} />
+      <Preloader onComplete={() => setLoadReady(true)} />
+      <Header route={route} go={go} loadReady={loadReady} />
       <PageShell pageKey={route}>{page}</PageShell>
     </div>
   );
