@@ -566,7 +566,7 @@ function Home({ go }) {
             data-page-reveal
             variants={fadeUp}
             className={cx(
-              "mx-auto mb-6 max-w-[15ch] text-[38px] md:text-[58px]",
+              "mx-auto mb-6 max-w-[18ch] text-[38px] sm:max-w-[20ch] md:max-w-[22ch] md:text-[58px]",
               title,
             )}
             style={{ letterSpacing: "0.045em" }}
@@ -577,7 +577,7 @@ function Home({ go }) {
           <motion.p
             data-page-reveal
             variants={fadeUp}
-            className={cx("mx-auto max-w-[34ch] text-[#a6a59f]", small)}
+            className={cx("mx-auto max-w-[42ch] sm:max-w-[48ch] text-[#a6a59f]", small)}
           >
             FOR FOUNDERS AND COMPANIES WHO REFUSE TO STAY UNDERVALUED.
           </motion.p>
