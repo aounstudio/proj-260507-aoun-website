@@ -302,7 +302,13 @@ function PageShell({ children, pageKey }) {
             "clipPath,position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,filter,y,scale",
         });
 
+        gsap.set(currentContainer, {
+          clearProps:
+            "position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,filter,y,scale",
+        });
+
         window.scrollTo(0, 0);
+
         setPages([{ key: pageKey, children, status: "current" }]);
 
         requestAnimationFrame(() => {
@@ -355,7 +361,7 @@ function PageShell({ children, pageKey }) {
     <div ref={wrapperRef} data-transition="wrapper">
       {pages.map((page) => (
         <div
-          key={page.key}
+          key={`${page.key}-${page.status}`}
           data-transition="container"
           data-transition-status={page.status}
         >
@@ -794,7 +800,9 @@ function MethodMinimal() {
         {items.map((item) => (
           <Reveal key={item}>
             <div className="bg-white/[0.035] p-5">
-              <p className={cx(small, "uppercase tracking-[0.12em]")}>{item}</p>
+              <p className={cx(small, "uppercase tracking-[0.12em]")}>
+                {item}
+              </p>
             </div>
           </Reveal>
         ))}
@@ -927,7 +935,11 @@ function StackGsapCard({ work, index, onSelect }) {
       <div className="relative h-full px-5 pb-5 pt-24 text-[#d8d8d2] md:px-8 md:pb-8 md:pt-28">
         <div
           data-stack-reveal
-          className={cx("flex justify-between text-[#aaa9a2]", small, "uppercase")}
+          className={cx(
+            "flex justify-between text-[#aaa9a2]",
+            small,
+            "uppercase",
+          )}
         >
           <span>{work.meta}</span>
           <span>0{index + 1}</span>
