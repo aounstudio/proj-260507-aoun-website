@@ -535,45 +535,6 @@ function SocialLinks({ route, loadReady }) {
     [0, 0.18],
     route === "home" ? [0, 0] : [10, 0],
   );
-  const [socialsVisible, setSocialsVisible] = useState(route === "home");
-  const isHome = route === "home";
-  const revealThreshold = viewportHeight * 0.52;
-  const hideThreshold = viewportHeight * 0.08;
-  const isVisible = isHome || socialsVisible;
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const updateViewportHeight = () => setViewportHeight(window.innerHeight);
-
-    updateViewportHeight();
-    window.addEventListener("resize", updateViewportHeight);
-    return () => window.removeEventListener("resize", updateViewportHeight);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    if (isHome) {
-      setSocialsVisible(true);
-      return;
-    }
-
-    setSocialsVisible(window.scrollY >= revealThreshold);
-
-    const updateSocialsVisibility = () => {
-      const scrollTop = window.scrollY;
-
-      setSocialsVisible((current) => {
-        if (!current && scrollTop >= revealThreshold) return true;
-        if (current && scrollTop <= hideThreshold) return false;
-        return current;
-      });
-    };
-
-    window.addEventListener("scroll", updateSocialsVisibility, { passive: true });
-    return () => window.removeEventListener("scroll", updateSocialsVisibility);
-  }, [hideThreshold, isHome, revealThreshold, route]);
 
   return (
     <motion.div
