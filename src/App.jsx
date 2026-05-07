@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useScroll, useSpring, useTransform } from "framer-motion";
+import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -472,14 +472,14 @@ function Header({ route, go }) {
 }
 
 function SocialLinks({ route }) {
-  const { scrollY } = useScroll();
   const [viewportHeight, setViewportHeight] = useState(() =>
     typeof window === "undefined" ? 1000 : window.innerHeight,
   );
+  const [socialsVisible, setSocialsVisible] = useState(route === "home");
   const isHome = route === "home";
-  const revealStart = viewportHeight * 0.4;
-  const revealEnd = revealStart + viewportHeight * 0.5;
-  const hiddenOffset = Math.max(140, viewportHeight * 0.42);
+  const revealThreshold = viewportHeight * 0.52;
+  const hideThreshold = viewportHeight * 0.08;
+  const isVisible = isHome || socialsVisible;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -491,41 +491,42 @@ function SocialLinks({ route }) {
     return () => window.removeEventListener("resize", updateViewportHeight);
   }, []);
 
-  const opacityTarget = useTransform(
-    scrollY,
-    [0, revealStart, revealEnd],
-    isHome ? [1, 1, 1] : [0, 0, 1],
-  );
-  const yTarget = useTransform(
-    scrollY,
-    [0, revealStart, revealEnd],
-    isHome ? [0, 0, 0] : [hiddenOffset, hiddenOffset, 0],
-  );
-  const blurTarget = useTransform(
-    scrollY,
-    [0, revealStart, revealEnd],
-    isHome ? [0, 0, 0] : [14, 14, 0],
-  );
-  const opacity = useSpring(opacityTarget, {
-    stiffness: 42,
-    damping: 32,
-    mass: 1.7,
-  });
-  const y = useSpring(yTarget, {
-    stiffness: 28,
-    damping: 36,
-    mass: 2.8,
-  });
-  const blur = useSpring(blurTarget, {
-    stiffness: 34,
-    damping: 34,
-    mass: 2.2,
-  });
-  const filter = useTransform(blur, (value) => `blur(${value}px)`);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (isHome) {
+      setSocialsVisible(true);
+      return;
+    }
+
+    setSocialsVisible(window.scrollY >= revealThreshold);
+
+    const updateSocialsVisibility = () => {
+      const scrollTop = window.scrollY;
+
+      setSocialsVisible((current) => {
+        if (!current && scrollTop >= revealThreshold) return true;
+        if (current && scrollTop <= hideThreshold) return false;
+        return current;
+      });
+    };
+
+    window.addEventListener("scroll", updateSocialsVisibility, { passive: true });
+    return () => window.removeEventListener("scroll", updateSocialsVisibility);
+  }, [hideThreshold, isHome, revealThreshold, route]);
 
   return (
     <motion.div
-      style={{ opacity, y, filter }}
+      initial={false}
+      animate={{
+        opacity: isVisible ? 1 : 0,
+        y: isVisible ? 0 : 54,
+        filter: isVisible ? "blur(0px)" : "blur(4px)",
+      }}
+      transition={{
+        duration: isVisible ? 1.2 : 0.8,
+        ease: isVisible ? [0.16, 1, 0.3, 1] : [0.7, 0, 0.84, 0],
+      }}
       className={cx(
         "fixed bottom-7 right-7 z-40 hidden gap-5 text-[#f0f0eb] mix-blend-difference will-change-[opacity,transform,filter] md:flex",
         navClass,
