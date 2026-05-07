@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from "framer-motion";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -18,15 +24,15 @@ const NAV = [
 
 const IMAGES = {
   architecture:
-    "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=2400&q=85",
+    "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=1600&q=76",
   food:
-    "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=2400&q=85",
+    "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1600&q=76",
   studio:
-    "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=2400&q=85",
+    "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=76",
   black:
-    "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=2400&q=85",
+    "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=76",
   portrait:
-    "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=2400&q=85",
+    "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1600&q=76",
 };
 
 const works = [
@@ -97,12 +103,11 @@ const small =
 const title = "font-thin leading-[0.95] tracking-[-0.035em]";
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 8, filter: "blur(8px)" },
+  hidden: { opacity: 0, y: 14 },
   show: {
     opacity: 1,
     y: 0,
-    filter: "blur(0px)",
-    transition: { duration: 1.35, ease: [0.16, 1, 0.3, 1] },
+    transition: { duration: 0.82, ease: [0.16, 1, 0.3, 1] },
   },
 };
 
@@ -125,75 +130,48 @@ function useHashRoute() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
-const go = useCallback((id) => {
-  if (typeof window === "undefined") return;
+  const go = useCallback((id) => {
+    if (typeof window === "undefined") return;
 
-  const currentRoute = getCurrentRoute();
+    const currentRoute = getCurrentRoute();
 
-  if (currentRoute === id) {
+    if (currentRoute === id) {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      return;
+    }
+
+    window.location.hash = id === "home" ? "" : id;
     window.scrollTo({ top: 0, behavior: "auto" });
-    return;
-  }
-
-  window.location.hash = id === "home" ? "" : id;
-  window.scrollTo({ top: 0, behavior: "auto" });
-}, []);
+  }, []);
 
   return { route, go };
 }
 
-function useHeavyScroll(route) {
+function useScrollPerformance(route) {
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.matchMedia("(pointer: coarse)").matches) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    let target = window.scrollY;
-    let current = window.scrollY;
-    let raf = null;
+    ScrollTrigger.config({ ignoreMobileResize: true });
+    ScrollTrigger.clearScrollMemory();
 
-    const maxScroll = () =>
-      Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-
-    const clamp = (value) => Math.max(0, Math.min(value, maxScroll()));
-
-    const animate = () => {
-      current += (target - current) * 0.078;
-      window.scrollTo(0, current);
-
-      if (Math.abs(target - current) < 0.35) {
-        current = target;
-        window.scrollTo(0, current);
-        raf = null;
-        return;
-      }
-
-      raf = requestAnimationFrame(animate);
+    let refreshFrame = 0;
+    const refresh = () => {
+      if (refreshFrame) cancelAnimationFrame(refreshFrame);
+      refreshFrame = requestAnimationFrame(() => {
+        refreshFrame = 0;
+        ScrollTrigger.refresh();
+      });
     };
 
-    const onWheel = (event) => {
-      const tag = event.target?.tagName?.toLowerCase();
-      if (["input", "textarea", "select", "option"].includes(tag)) return;
-
-      event.preventDefault();
-      target = clamp(target + event.deltaY * 0.82);
-
-      if (!raf) raf = requestAnimationFrame(animate);
-    };
-
-    const onResize = () => {
-      target = clamp(window.scrollY);
-      current = target;
-      ScrollTrigger.refresh();
-    };
-
-    window.addEventListener("wheel", onWheel, { passive: false });
-    window.addEventListener("resize", onResize);
+    const routeRefresh = window.setTimeout(refresh, 80);
+    window.addEventListener("resize", refresh, { passive: true });
+    window.addEventListener("orientationchange", refresh, { passive: true });
 
     return () => {
-      window.removeEventListener("wheel", onWheel);
-      window.removeEventListener("resize", onResize);
-      if (raf) cancelAnimationFrame(raf);
+      window.clearTimeout(routeRefresh);
+      window.removeEventListener("resize", refresh);
+      window.removeEventListener("orientationchange", refresh);
+      if (refreshFrame) cancelAnimationFrame(refreshFrame);
     };
   }, [route]);
 }
@@ -246,7 +224,7 @@ function PageShell({ children, pageKey }) {
     });
 
     gsap.set(nextContainer, {
-      clipPath: "inset(100% 0% 0% 0%)",
+      yPercent: 100,
       opacity: 1,
       position: "fixed",
       inset: 0,
@@ -265,7 +243,7 @@ function PageShell({ children, pageKey }) {
       onComplete: () => {
         gsap.set(nextContainer, {
           clearProps:
-            "clipPath,position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,filter,y,scale",
+            "position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,yPercent,y,scale",
         });
 
         window.scrollTo(0, 0);
@@ -281,10 +259,10 @@ function PageShell({ children, pageKey }) {
       .to(
         currentContainer,
         {
-          y: "-22vh",
-          opacity: 0.32,
-          scale: 0.88,
-          duration: 1.05,
+          yPercent: -10,
+          opacity: 0.42,
+          scale: 0.94,
+          duration: 0.74,
           force3D: true,
         },
         0,
@@ -292,21 +270,20 @@ function PageShell({ children, pageKey }) {
       .to(
         nextContainer,
         {
-          clipPath: "inset(0% 0% 0% 0%)",
-          duration: 1.05,
+          yPercent: 0,
+          duration: 0.74,
           force3D: true,
         },
         0,
       )
       .fromTo(
         revealItems,
-        { opacity: 0, y: 10, filter: "blur(8px)" },
+        { opacity: 0, y: 12 },
         {
           opacity: 1,
           y: 0,
-          filter: "blur(0px)",
-          duration: 0.8,
-          stagger: 0.07,
+          duration: 0.48,
+          stagger: 0.045,
           ease: "power3.out",
         },
         0.48,
@@ -333,13 +310,19 @@ function PageShell({ children, pageKey }) {
 }
 
 function Reveal({ children, className = "" }) {
+  const reduceMotion = useReducedMotion();
+
+  if (reduceMotion) {
+    return <div className={className}>{children}</div>;
+  }
+
   return (
     <motion.div
-      className={className}
+      className={cx("transform-gpu", className)}
       variants={fadeUp}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: true, margin: "-10%" }}
+      viewport={{ once: true, margin: "0px 0px -12%" }}
     >
       {children}
     </motion.div>
@@ -381,32 +364,10 @@ function AounLogo({ tone = "light", className = "" }) {
 
 function Preloader() {
   const [done, setDone] = useState(false);
-  const [count, setCount] = useState(0);
 
   useEffect(() => {
-    const duration = 1400;
-    const start = performance.now();
-    let raf;
-    let timeout;
-
-    const tick = (now) => {
-      const progress = Math.min(1, (now - start) / duration);
-
-      setCount(Math.round(progress * 100));
-
-      if (progress < 1) {
-        raf = requestAnimationFrame(tick);
-      } else {
-        timeout = window.setTimeout(() => setDone(true), 260);
-      }
-    };
-
-    raf = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      if (timeout) window.clearTimeout(timeout);
-    };
+    const timeout = window.setTimeout(() => setDone(true), 760);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   return (
@@ -419,14 +380,9 @@ function Preloader() {
         >
           <div className="flex flex-col items-center gap-4">
             <div className="relative h-8 w-px overflow-hidden bg-white/10">
-              <motion.div
-                className="absolute bottom-0 left-0 w-px bg-[#d8d8d2]"
-                initial={{ height: "0%" }}
-                animate={{ height: `${count}%` }}
-                transition={{ duration: 0.14 }}
-              />
+              <span className="preloader-line absolute bottom-0 left-0 w-px bg-[#d8d8d2]" />
             </div>
-            <p className={cx(navClass, "tabular-nums")}>{count}</p>
+            <p className={navClass}>AOUN</p>
           </div>
         </motion.div>
       )}
@@ -529,7 +485,7 @@ function CTA({ children, onClick, light = false }) {
   );
 }
 
-function ParallaxMedia({ src, alt = "", className = "" }) {
+function ParallaxMedia({ src, alt = "", className = "", priority = false }) {
   const ref = useRef(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -544,9 +500,10 @@ function ParallaxMedia({ src, alt = "", className = "" }) {
         src={src}
         alt={alt}
         style={{ y, scale }}
-        className="h-full w-full object-cover grayscale"
-        loading="lazy"
+        className="h-full w-full transform-gpu object-cover grayscale will-change-transform"
+        loading={priority ? "eager" : "lazy"}
         decoding="async"
+        fetchPriority={priority ? "high" : "auto"}
       />
     </div>
   );
@@ -658,6 +615,7 @@ function DarkFeatureImage() {
             src={IMAGES.architecture}
             alt="AOUN editorial placeholder"
             className="h-[58vh] md:h-[70vh]"
+            priority
           />
         </div>
       </Reveal>
@@ -771,9 +729,9 @@ function StackedWorks({ onSelect }) {
 
         if (index !== 0) {
           gsap.set(card, { yPercent: 100 });
-          gsap.set(content, { opacity: 0, y: 8, filter: "blur(8px)" });
+          gsap.set(content, { opacity: 0, y: 10 });
         } else {
-          gsap.set(content, { opacity: 1, y: 0, filter: "blur(0px)" });
+          gsap.set(content, { opacity: 1, y: 0 });
         }
       });
 
@@ -798,7 +756,7 @@ function StackedWorks({ onSelect }) {
         const nextMedia = nextCard.querySelector("[data-stack-media]");
         const nextContent = nextCard.querySelectorAll("[data-stack-reveal]");
 
-        timeline.to(card, { scale: 0.92, borderRadius: "10px", duration: 1 });
+        timeline.to(card, { scale: 0.94, duration: 1 });
 
         if (media) {
           timeline.to(media, { scale: 1.035, duration: 1 }, "<");
@@ -816,7 +774,6 @@ function StackedWorks({ onSelect }) {
             {
               opacity: 1,
               y: 0,
-              filter: "blur(0px)",
               stagger: 0.035,
               duration: 0.22,
               ease: "power2.out",
@@ -857,14 +814,14 @@ function StackGsapCard({ work, index, onSelect }) {
       type="button"
       data-stack-card
       onClick={onSelect}
-      className="absolute inset-0 h-screen w-full origin-top overflow-hidden bg-[#111] text-left"
+      className="absolute inset-0 h-screen w-full origin-top overflow-hidden bg-[#111] text-left will-change-transform"
       style={{ zIndex: index + 1 }}
     >
       <img
         data-stack-media
         src={work.image}
         alt={work.title}
-        className="absolute inset-0 h-full w-full scale-[1.01] object-cover grayscale"
+        className="absolute inset-0 h-full w-full scale-[1.01] transform-gpu object-cover grayscale will-change-transform"
         loading="lazy"
         decoding="async"
       />
@@ -1341,10 +1298,10 @@ function Apply() {
             <motion.div
               data-page-reveal
               key={formSteps[step]}
-              initial={{ opacity: 0, y: 10, filter: "blur(10px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: -8, filter: "blur(8px)" }}
-              transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
             >
               <label>
                 <span className="mb-12 block text-[28px] font-normal leading-[1] tracking-[0.03em] md:text-[56px]">
@@ -1396,7 +1353,7 @@ function Apply() {
 
 export default function AounWebsitePrototype() {
   const { route, go } = useHashRoute();
-  useHeavyScroll(route);
+  useScrollPerformance(route);
 
   const page = useMemo(() => {
     switch (route) {
@@ -1428,6 +1385,12 @@ export default function AounWebsitePrototype() {
         button, input, textarea, select { font: inherit; }
         ::-webkit-scrollbar { width: 0px; height: 0px; }
         img { content-visibility: auto; }
+        .preloader-line { height: 100%; transform-origin: bottom; animation: preloader-rise 0.72s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        [data-transition="container"] { backface-visibility: hidden; transform: translateZ(0); }
+        @keyframes preloader-rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.001ms !important; }
+        }
         select option { background: ${PAPER_SOFT}; color: ${PAPER_TEXT}; }
       `}</style>
 
