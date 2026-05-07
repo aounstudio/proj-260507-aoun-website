@@ -870,7 +870,7 @@ function StackGsapCard({ work, index, onSelect }) {
       />
       <div className="absolute inset-0 bg-black/42" />
 
-      <div className="relative flex h-full flex-col justify-between px-5 pb-5 pt-24 text-[#d8d8d2] md:px-8 md:pb-8 md:pt-28">
+      <div className="relative h-full px-5 pb-5 pt-24 text-[#d8d8d2] md:px-8 md:pb-8 md:pt-28">
         <div
           data-stack-reveal
           className={cx("flex justify-between text-[#aaa9a2]", small, "uppercase")}
@@ -879,7 +879,7 @@ function StackGsapCard({ work, index, onSelect }) {
           <span>0{index + 1}</span>
         </div>
 
-        <div className="text-left">
+        <div className="absolute left-5 top-[66.666%] max-w-[calc(100%-2.5rem)] text-left md:left-8 md:max-w-[calc(100%-4rem)]">
           <h3
             data-stack-reveal
             className="mb-5 text-[36px] font-thin leading-[0.95] tracking-[0.03em] md:text-[82px]"
