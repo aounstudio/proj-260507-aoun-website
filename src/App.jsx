@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
+import { AnimatePresence, motion, useScroll, useSpring, useTransform } from "framer-motion";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -472,23 +472,62 @@ function Header({ route, go }) {
 }
 
 function SocialLinks({ route }) {
-  const { scrollYProgress } = useScroll();
-  const opacity = useTransform(
-    scrollYProgress,
-    [0, 0.08, 0.18],
-    route === "home" ? [1, 1, 1] : [0, 0, 1],
+  const { scrollY } = useScroll();
+  const [viewportHeight, setViewportHeight] = useState(() =>
+    typeof window === "undefined" ? 1000 : window.innerHeight,
   );
-  const y = useTransform(
-    scrollYProgress,
-    [0, 0.18],
-    route === "home" ? [0, 0] : [10, 0],
+  const isHome = route === "home";
+  const revealStart = viewportHeight * 0.4;
+  const revealEnd = revealStart + viewportHeight * 0.5;
+  const hiddenOffset = Math.max(140, viewportHeight * 0.42);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateViewportHeight = () => setViewportHeight(window.innerHeight);
+
+    updateViewportHeight();
+    window.addEventListener("resize", updateViewportHeight);
+    return () => window.removeEventListener("resize", updateViewportHeight);
+  }, []);
+
+  const opacityTarget = useTransform(
+    scrollY,
+    [0, revealStart, revealEnd],
+    isHome ? [1, 1, 1] : [0, 0, 1],
   );
+  const yTarget = useTransform(
+    scrollY,
+    [0, revealStart, revealEnd],
+    isHome ? [0, 0, 0] : [hiddenOffset, hiddenOffset, 0],
+  );
+  const blurTarget = useTransform(
+    scrollY,
+    [0, revealStart, revealEnd],
+    isHome ? [0, 0, 0] : [14, 14, 0],
+  );
+  const opacity = useSpring(opacityTarget, {
+    stiffness: 42,
+    damping: 32,
+    mass: 1.7,
+  });
+  const y = useSpring(yTarget, {
+    stiffness: 28,
+    damping: 36,
+    mass: 2.8,
+  });
+  const blur = useSpring(blurTarget, {
+    stiffness: 34,
+    damping: 34,
+    mass: 2.2,
+  });
+  const filter = useTransform(blur, (value) => `blur(${value}px)`);
 
   return (
     <motion.div
-      style={{ opacity, y }}
+      style={{ opacity, y, filter }}
       className={cx(
-        "fixed bottom-7 right-7 z-40 hidden gap-5 text-[#f0f0eb] mix-blend-difference md:flex",
+        "fixed bottom-7 right-7 z-40 hidden gap-5 text-[#f0f0eb] mix-blend-difference will-change-[opacity,transform,filter] md:flex",
         navClass,
       )}
     >
