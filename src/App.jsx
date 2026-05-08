@@ -403,6 +403,11 @@ function PageShell({ children, pageKey }) {
           clearProps:
             "position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,filter,y,scale",
         });
+        gsap.set(revealItems, { clearProps: "opacity,filter,transform,y" });
+        if (pageHeading) {
+          gsap.set(pageHeading, { clearProps: "opacity,filter,transform,y" });
+        }
+        gsap.set(headingChars, { clearProps: "transform,willChange" });
 
         window.scrollTo(0, 0);
 
@@ -753,6 +758,7 @@ function Home({ go, loadReady }) {
           className="relative z-10 text-center"
         >
           <motion.h1
+            data-page-title
             data-page-reveal
             variants={homeReveal}
             custom={0}
