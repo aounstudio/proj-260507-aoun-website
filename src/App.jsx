@@ -96,6 +96,52 @@ const small =
   "text-[12px] md:text-[13px] tracking-[0.03em] leading-[1.28] font-normal";
 const title = "font-thin leading-[0.95] tracking-[-0.035em]";
 
+const PAGE_TRANSITION = {
+  coverDuration: 1.55,
+  oldPageHold: 0.28,
+  oldPageDuration: 1.18,
+  titleDelay: 0.72,
+  titleDuration: 1.18,
+  contentDelay: 1.34,
+  contentDuration: 0.95,
+  contentStagger: 0.13,
+};
+
+function AnimatedTitle({
+  children,
+  as: Component = "h1",
+  className = "",
+  style,
+  reveal = true,
+}) {
+  const text = String(children);
+
+  return (
+    <Component
+      data-page-title={reveal ? "" : undefined}
+      aria-label={text}
+      className={cx("overflow-hidden", className)}
+      style={style}
+    >
+      <span aria-hidden="true" className="inline-block">
+        {Array.from(text).map((char, index) => (
+          <span
+            key={`${char}-${index}`}
+            className="inline-block overflow-hidden align-baseline"
+          >
+            <span
+              data-title-char={reveal ? "" : undefined}
+              className="inline-block will-change-transform"
+            >
+              {char === " " ? "\u00A0" : char}
+            </span>
+          </span>
+        ))}
+      </span>
+    </Component>
+  );
+}
+
 const fadeUp = {
   hidden: { opacity: 0, y: 8, filter: "blur(8px)" },
   show: {
@@ -258,15 +304,36 @@ function PageShell({ children, pageKey }) {
       force3D: true,
     });
 
+    const titleChars = nextContainer.querySelectorAll("[data-title-char]");
     const revealItems = nextContainer.querySelectorAll("[data-page-reveal]");
+
+    gsap.set(titleChars, {
+      yPercent: 112,
+      rotateX: -72,
+      opacity: 1,
+      transformOrigin: "50% 100%",
+      transformPerspective: 900,
+      force3D: true,
+    });
+
+    gsap.set(revealItems, {
+      opacity: 0,
+      y: 18,
+      filter: "blur(10px)",
+      force3D: true,
+    });
 
     timelineRef.current = gsap.timeline({
       defaults: { ease: "power4.inOut" },
       onComplete: () => {
         gsap.set(nextContainer, {
           clearProps:
-            "clipPath,position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,filter,y,scale",
+            "clipPath,position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,filter,y,scale,rotateX",
         });
+        gsap.set(titleChars, {
+          clearProps: "transform,opacity,transformOrigin,transformPerspective",
+        });
+        gsap.set(revealItems, { clearProps: "transform,opacity,filter,y" });
 
         window.scrollTo(0, 0);
         setPages([{ key: pageKey, children, status: "current" }]);
@@ -281,35 +348,55 @@ function PageShell({ children, pageKey }) {
       .to(
         currentContainer,
         {
-          y: "-22vh",
-          opacity: 0.32,
-          scale: 0.88,
-          duration: 1.05,
+          y: "-30vh",
+          scale: 0.92,
+          duration: PAGE_TRANSITION.oldPageDuration,
           force3D: true,
         },
         0,
       )
       .to(
+        currentContainer,
+        {
+          opacity: 0.48,
+          duration:
+            PAGE_TRANSITION.oldPageDuration - PAGE_TRANSITION.oldPageHold,
+          ease: "power2.inOut",
+        },
+        PAGE_TRANSITION.oldPageHold,
+      )
+      .to(
         nextContainer,
         {
           clipPath: "inset(0% 0% 0% 0%)",
-          duration: 1.05,
+          duration: PAGE_TRANSITION.coverDuration,
           force3D: true,
         },
         0,
       )
-      .fromTo(
+      .to(
+        titleChars,
+        {
+          yPercent: 0,
+          rotateX: 0,
+          duration: PAGE_TRANSITION.titleDuration,
+          stagger: { each: 0.045, from: "start" },
+          ease: "expo.out",
+          force3D: true,
+        },
+        PAGE_TRANSITION.titleDelay,
+      )
+      .to(
         revealItems,
-        { opacity: 0, y: 10, filter: "blur(8px)" },
         {
           opacity: 1,
           y: 0,
           filter: "blur(0px)",
-          duration: 0.8,
-          stagger: 0.07,
+          duration: PAGE_TRANSITION.contentDuration,
+          stagger: PAGE_TRANSITION.contentStagger,
           ease: "power3.out",
         },
-        0.48,
+        PAGE_TRANSITION.contentDelay,
       );
 
     return () => {
@@ -562,17 +649,17 @@ function Home({ go }) {
           variants={stagger}
           className="relative z-10 text-center"
         >
-          <motion.h1
-            data-page-reveal
-            variants={fadeUp}
-            className={cx(
-              "mx-auto mb-6 max-w-[15ch] text-[38px] md:text-[58px]",
-              title,
-            )}
-            style={{ letterSpacing: "0.045em" }}
-          >
-            AOUN builds brands for value that must be seen, trusted and desired.
-          </motion.h1>
+          <motion.div variants={fadeUp}>
+            <AnimatedTitle
+              className={cx(
+                "mx-auto mb-6 max-w-[15ch] text-[38px] md:text-[58px]",
+                title,
+              )}
+              style={{ letterSpacing: "0.045em" }}
+            >
+              AOUN builds brands for value that must be seen, trusted and desired.
+            </AnimatedTitle>
+          </motion.div>
 
           <motion.p
             data-page-reveal
@@ -1062,25 +1149,25 @@ function SubPage({ children }) {
 function PageHero({ title, children }) {
   return (
     <section className="flex min-h-screen flex-col justify-between px-7 pb-8 pt-24">
-      <motion.h1
-        data-page-reveal
-        variants={fadeUp}
-        initial="hidden"
-        animate="show"
-        className="text-[44px] font-thin leading-[0.96] tracking-[0.04em] md:text-[90px]"
-      >
-        {title}
-      </motion.h1>
-
-      <motion.div
-        data-page-reveal
-        variants={fadeUp}
-        initial="hidden"
-        animate="show"
-        className="grid gap-8 md:grid-cols-4 md:items-end"
-      >
-        {children}
+      <motion.div variants={fadeUp} initial="hidden" animate="show">
+        <AnimatedTitle className="text-[44px] font-thin leading-[0.96] tracking-[0.04em] md:text-[90px]">
+          {title}
+        </AnimatedTitle>
       </motion.div>
+
+      <div className="grid gap-8 md:grid-cols-4 md:items-end">
+        {React.Children.map(children, (child, index) => (
+          <motion.div
+            data-page-reveal
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            transition={{ delay: index * 0.1 }}
+          >
+            {child}
+          </motion.div>
+        ))}
+      </div>
     </section>
   );
 }
