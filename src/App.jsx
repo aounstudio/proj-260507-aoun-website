@@ -106,9 +106,25 @@ const fadeUp = {
   },
 };
 
+const splitHeading = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.026, delayChildren: 0.02 },
+  },
+};
+
+const splitHeadingChar = {
+  hidden: { y: "108%", rotateX: 58 },
+  show: {
+    y: "0%",
+    rotateX: 0,
+    transition: { duration: 1.55, ease: [0.16, 1, 0.3, 1] },
+  },
+};
+
 const stagger = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.08 } },
+  show: { transition: { staggerChildren: 0.12, delayChildren: 1.05 } },
 };
 
 function getCurrentRoute() {
@@ -258,7 +274,25 @@ function PageShell({ children, pageKey }) {
       force3D: true,
     });
 
-    const revealItems = nextContainer.querySelectorAll("[data-page-reveal]");
+    const pageTitle = nextContainer.querySelector("[data-page-title]");
+    const titleChars = nextContainer.querySelectorAll("[data-title-char]");
+    const revealItems = Array.from(
+      nextContainer.querySelectorAll("[data-page-reveal]"),
+    ).filter((item) => item !== pageTitle);
+    const titleTweenTarget = titleChars.length > 0 ? titleChars : pageTitle;
+
+    if (pageTitle) gsap.set(pageTitle, { opacity: 1 });
+    if (titleChars.length > 0) {
+      gsap.set(titleChars, {
+        yPercent: 112,
+        rotateX: 58,
+        transformOrigin: "50% 100%",
+        force3D: true,
+        backfaceVisibility: "hidden",
+        willChange: "transform",
+      });
+    }
+    gsap.set(revealItems, { opacity: 0, y: 14, filter: "blur(8px)" });
 
     timelineRef.current = gsap.timeline({
       defaults: { ease: "power4.inOut" },
@@ -266,6 +300,10 @@ function PageShell({ children, pageKey }) {
         gsap.set(nextContainer, {
           clearProps:
             "clipPath,position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,filter,y,scale",
+        });
+        gsap.set([pageTitle, ...titleChars, ...revealItems].filter(Boolean), {
+          clearProps:
+            "opacity,filter,y,yPercent,rotateX,transform,transformOrigin,willChange,backfaceVisibility",
         });
 
         window.scrollTo(0, 0);
@@ -281,35 +319,54 @@ function PageShell({ children, pageKey }) {
       .to(
         currentContainer,
         {
-          y: "-22vh",
-          opacity: 0.32,
-          scale: 0.88,
-          duration: 1.05,
+          y: "-28vh",
+          scale: 0.86,
+          duration: 1.55,
           force3D: true,
         },
         0,
       )
       .to(
+        currentContainer,
+        {
+          opacity: 0.34,
+          duration: 0.82,
+          ease: "power2.out",
+        },
+        0.52,
+      )
+      .to(
         nextContainer,
         {
           clipPath: "inset(0% 0% 0% 0%)",
-          duration: 1.05,
+          duration: 1.55,
           force3D: true,
         },
         0,
       )
-      .fromTo(
+      .to(
+        titleTweenTarget,
+        {
+          yPercent: 0,
+          rotateX: 0,
+          duration: 1.65,
+          stagger: { amount: 0.48, from: "start" },
+          ease: "expo.out",
+          force3D: true,
+        },
+        1.02,
+      )
+      .to(
         revealItems,
-        { opacity: 0, y: 10, filter: "blur(8px)" },
         {
           opacity: 1,
           y: 0,
           filter: "blur(0px)",
-          duration: 0.8,
-          stagger: 0.07,
+          duration: 1.05,
+          stagger: 0.12,
           ease: "power3.out",
         },
-        0.48,
+        2.2,
       );
 
     return () => {
@@ -329,6 +386,36 @@ function PageShell({ children, pageKey }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function SplitHeading({ children, className = "", style, ...props }) {
+  const text = String(children);
+
+  return (
+    <motion.h1
+      {...props}
+      data-page-reveal
+      data-page-title
+      aria-label={text}
+      initial="hidden"
+      animate="show"
+      variants={splitHeading}
+      className={cx("overflow-hidden", className)}
+      style={{ ...style, perspective: "1000px" }}
+    >
+      {Array.from(text).map((char, index) => (
+        <motion.span
+          key={`${char}-${index}`}
+          aria-hidden="true"
+          data-title-char
+          variants={splitHeadingChar}
+          className="inline-block origin-[50%_100%] will-change-transform"
+        >
+          {char === " " ? "\u00A0" : char}
+        </motion.span>
+      ))}
+    </motion.h1>
   );
 }
 
@@ -562,9 +649,7 @@ function Home({ go }) {
           variants={stagger}
           className="relative z-10 text-center"
         >
-          <motion.h1
-            data-page-reveal
-            variants={fadeUp}
+          <SplitHeading
             className={cx(
               "mx-auto mb-6 max-w-[15ch] text-[38px] md:text-[58px]",
               title,
@@ -572,7 +657,7 @@ function Home({ go }) {
             style={{ letterSpacing: "0.045em" }}
           >
             AOUN builds brands for value that must be seen, trusted and desired.
-          </motion.h1>
+          </SplitHeading>
 
           <motion.p
             data-page-reveal
@@ -1062,15 +1147,9 @@ function SubPage({ children }) {
 function PageHero({ title, children }) {
   return (
     <section className="flex min-h-screen flex-col justify-between px-7 pb-8 pt-24">
-      <motion.h1
-        data-page-reveal
-        variants={fadeUp}
-        initial="hidden"
-        animate="show"
-        className="text-[44px] font-thin leading-[0.96] tracking-[0.04em] md:text-[90px]"
-      >
+      <SplitHeading className="text-[44px] font-thin leading-[0.96] tracking-[0.04em] md:text-[90px]">
         {title}
-      </motion.h1>
+      </SplitHeading>
 
       <motion.div
         data-page-reveal
