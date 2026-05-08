@@ -125,19 +125,19 @@ function useHashRoute() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
-const go = useCallback((id) => {
-  if (typeof window === "undefined") return;
+  const go = useCallback((id) => {
+    if (typeof window === "undefined") return;
 
-  const currentRoute = getCurrentRoute();
+    const currentRoute = getCurrentRoute();
 
-  if (currentRoute === id) {
+    if (currentRoute === id) {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      return;
+    }
+
+    window.location.hash = id === "home" ? "" : id;
     window.scrollTo({ top: 0, behavior: "auto" });
-    return;
-  }
-
-  window.location.hash = id === "home" ? "" : id;
-  window.scrollTo({ top: 0, behavior: "auto" });
-}, []);
+  }, []);
 
   return { route, go };
 }
@@ -196,6 +196,37 @@ function useHeavyScroll(route) {
       if (raf) cancelAnimationFrame(raf);
     };
   }, [route]);
+}
+
+function splitHeadingChars(heading) {
+  if (!heading || heading.dataset.splitTransition === "true") return [];
+
+  const text = heading.textContent || "";
+  heading.dataset.splitTransition = "true";
+  heading.setAttribute("aria-label", text);
+  heading.textContent = "";
+
+  const chars = Array.from(text).map((char) => {
+    const outer = document.createElement("span");
+    const inner = document.createElement("span");
+
+    outer.setAttribute("aria-hidden", "true");
+    outer.style.display = "inline-block";
+    outer.style.overflow = "hidden";
+    outer.style.verticalAlign = "top";
+
+    inner.textContent = char === " " ? "\u00a0" : char;
+    inner.style.display = "inline-block";
+    inner.style.transformOrigin = "50% 100%";
+    inner.style.willChange = "transform";
+
+    outer.appendChild(inner);
+    heading.appendChild(outer);
+
+    return inner;
+  });
+
+  return chars;
 }
 
 function PageShell({ children, pageKey }) {
@@ -258,7 +289,34 @@ function PageShell({ children, pageKey }) {
       force3D: true,
     });
 
-    const revealItems = nextContainer.querySelectorAll("[data-page-reveal]");
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const pageHeading = nextContainer.querySelector(
+      "[data-page-title], h1[data-page-reveal]",
+    );
+    const headingChars = prefersReducedMotion
+      ? []
+      : splitHeadingChars(pageHeading);
+    const revealItems = Array.from(
+      nextContainer.querySelectorAll("[data-page-reveal]"),
+    ).filter((item) => item !== pageHeading);
+
+    gsap.set(revealItems, { opacity: 0, y: 14, filter: "blur(10px)" });
+
+    if (pageHeading) {
+      gsap.set(pageHeading, { opacity: 1, filter: "blur(0px)" });
+    }
+
+    if (headingChars.length) {
+      gsap.set(headingChars, {
+        yPercent: 118,
+        rotateX: -42,
+        rotateZ: 2.5,
+        transformPerspective: 900,
+        force3D: true,
+      });
+    }
 
     timelineRef.current = gsap.timeline({
       defaults: { ease: "power4.inOut" },
@@ -267,6 +325,11 @@ function PageShell({ children, pageKey }) {
           clearProps:
             "clipPath,position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,filter,y,scale",
         });
+        gsap.set(revealItems, { clearProps: "opacity,filter,transform,y" });
+        if (pageHeading) {
+          gsap.set(pageHeading, { clearProps: "opacity,filter,transform,y" });
+        }
+        gsap.set(headingChars, { clearProps: "transform,willChange" });
 
         window.scrollTo(0, 0);
         setPages([{ key: pageKey, children, status: "current" }]);
@@ -281,36 +344,62 @@ function PageShell({ children, pageKey }) {
       .to(
         currentContainer,
         {
-          y: "-22vh",
-          opacity: 0.32,
-          scale: 0.88,
-          duration: 1.05,
+          y: "-28vh",
+          opacity: 0.72,
+          scale: 0.94,
+          duration: prefersReducedMotion ? 0.35 : 1.55,
           force3D: true,
         },
         0,
       )
       .to(
+        currentContainer,
+        {
+          opacity: 0.18,
+          filter: "blur(8px)",
+          duration: prefersReducedMotion ? 0.25 : 0.72,
+          ease: "power2.inOut",
+        },
+        prefersReducedMotion ? 0.1 : 0.82,
+      )
+      .to(
         nextContainer,
         {
           clipPath: "inset(0% 0% 0% 0%)",
-          duration: 1.05,
+          duration: prefersReducedMotion ? 0.45 : 1.55,
           force3D: true,
         },
         0,
-      )
-      .fromTo(
-        revealItems,
-        { opacity: 0, y: 10, filter: "blur(8px)" },
-        {
-          opacity: 1,
-          y: 0,
-          filter: "blur(0px)",
-          duration: 0.8,
-          stagger: 0.07,
-          ease: "power3.out",
-        },
-        0.48,
       );
+
+    if (headingChars.length) {
+      timelineRef.current.to(
+        headingChars,
+        {
+          yPercent: 0,
+          rotateX: 0,
+          rotateZ: 0,
+          duration: 0.95,
+          stagger: 0.018,
+          ease: "expo.out",
+          force3D: true,
+        },
+        0.82,
+      );
+    }
+
+    timelineRef.current.to(
+      revealItems,
+      {
+        opacity: 1,
+        y: 0,
+        filter: "blur(0px)",
+        duration: prefersReducedMotion ? 0.25 : 0.95,
+        stagger: prefersReducedMotion ? 0 : 0.105,
+        ease: "power3.out",
+      },
+      prefersReducedMotion ? 0.2 : 1.38,
+    );
 
     return () => {
       if (timelineRef.current) timelineRef.current.kill();
@@ -563,6 +652,7 @@ function Home({ go }) {
           className="relative z-10 text-center"
         >
           <motion.h1
+            data-page-title
             data-page-reveal
             variants={fadeUp}
             className={cx(
@@ -1063,6 +1153,7 @@ function PageHero({ title, children }) {
   return (
     <section className="flex min-h-screen flex-col justify-between px-7 pb-8 pt-24">
       <motion.h1
+        data-page-title
         data-page-reveal
         variants={fadeUp}
         initial="hidden"
@@ -1073,13 +1164,16 @@ function PageHero({ title, children }) {
       </motion.h1>
 
       <motion.div
-        data-page-reveal
         variants={fadeUp}
         initial="hidden"
         animate="show"
         className="grid gap-8 md:grid-cols-4 md:items-end"
       >
-        {children}
+        {React.Children.map(children, (child) =>
+          React.isValidElement(child)
+            ? React.cloneElement(child, { "data-page-reveal": true })
+            : child,
+        )}
       </motion.div>
     </section>
   );
