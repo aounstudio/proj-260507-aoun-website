@@ -198,6 +198,36 @@ function useHeavyScroll(route) {
   }, [route]);
 }
 
+
+function splitTitleForTransition(titleElement) {
+  if (!titleElement) return [];
+
+  const text = titleElement.textContent || "";
+  const chars = Array.from(text);
+
+  titleElement.setAttribute("aria-label", text.trim());
+  titleElement.textContent = "";
+
+  chars.forEach((char) => {
+    const wrapper = document.createElement("span");
+    const inner = document.createElement("span");
+
+    wrapper.setAttribute("aria-hidden", "true");
+    wrapper.style.display = "inline-block";
+    wrapper.style.overflow = "hidden";
+    wrapper.style.verticalAlign = "top";
+
+    inner.style.display = "inline-block";
+    inner.style.transformOrigin = "50% 100%";
+    inner.textContent = char === " " ? "\u00a0" : char;
+
+    wrapper.appendChild(inner);
+    titleElement.appendChild(wrapper);
+  });
+
+  return Array.from(titleElement.querySelectorAll("span > span"));
+}
+
 function PageShell({ children, pageKey }) {
   const wrapperRef = useRef(null);
   const timelineRef = useRef(null);
@@ -258,7 +288,32 @@ function PageShell({ children, pageKey }) {
       force3D: true,
     });
 
-    const revealItems = nextContainer.querySelectorAll("[data-page-reveal]");
+    const revealItems = gsap.utils.toArray(
+      nextContainer.querySelectorAll("[data-page-reveal]"),
+    );
+    const titleElement = nextContainer.querySelector(
+      "h1[data-page-reveal], [data-page-title]",
+    );
+    const supportingRevealItems = revealItems.filter(
+      (item) => item !== titleElement && !item.contains(titleElement),
+    );
+    const titleChars = splitTitleForTransition(titleElement);
+
+    gsap.set(revealItems, { opacity: 0, y: 12, filter: "blur(8px)" });
+
+    if (titleElement) {
+      gsap.set(titleElement, { opacity: 1, y: 0, filter: "blur(0px)" });
+    }
+
+    if (titleChars.length) {
+      gsap.set(titleChars, {
+        rotateX: -92,
+        yPercent: 105,
+        transformPerspective: 1000,
+        transformOrigin: "50% 100%",
+        force3D: true,
+      });
+    }
 
     timelineRef.current = gsap.timeline({
       defaults: { ease: "power4.inOut" },
@@ -281,11 +336,12 @@ function PageShell({ children, pageKey }) {
       .to(
         currentContainer,
         {
-          y: "-22vh",
-          opacity: 0.32,
-          scale: 0.88,
-          duration: 1.05,
+          y: "-18vh",
+          opacity: 0.72,
+          scale: 0.94,
+          duration: 1.55,
           force3D: true,
+          ease: "power3.inOut",
         },
         0,
       )
@@ -293,24 +349,51 @@ function PageShell({ children, pageKey }) {
         nextContainer,
         {
           clipPath: "inset(0% 0% 0% 0%)",
-          duration: 1.05,
+          duration: 1.65,
           force3D: true,
+          ease: "power3.inOut",
         },
         0,
-      )
-      .fromTo(
-        revealItems,
-        { opacity: 0, y: 10, filter: "blur(8px)" },
+      );
+
+    if (titleChars.length) {
+      timelineRef.current.to(
+        titleChars,
+        {
+          rotateX: 0,
+          yPercent: 0,
+          duration: 1.6,
+          stagger: 0.028,
+          ease: "expo.out",
+        },
+        0.62,
+      );
+    } else if (titleElement) {
+      timelineRef.current.to(
+        titleElement,
         {
           opacity: 1,
           y: 0,
           filter: "blur(0px)",
-          duration: 0.8,
-          stagger: 0.07,
+          duration: 1.2,
           ease: "power3.out",
         },
-        0.48,
+        0.78,
       );
+    }
+
+    timelineRef.current.to(
+      supportingRevealItems,
+      {
+        opacity: 1,
+        y: 0,
+        filter: "blur(0px)",
+        duration: 1.05,
+        stagger: 0.12,
+        ease: "power3.out",
+      },
+      1.24,
+    );
 
     return () => {
       if (timelineRef.current) timelineRef.current.kill();
