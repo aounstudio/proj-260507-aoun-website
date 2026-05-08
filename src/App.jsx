@@ -96,6 +96,52 @@ const small =
   "text-[12px] md:text-[13px] tracking-[0.03em] leading-[1.28] font-normal";
 const title = "font-thin leading-[0.95] tracking-[-0.035em]";
 
+const PAGE_TRANSITION = {
+  coverDuration: 1.55,
+  oldPageHold: 0.28,
+  oldPageDuration: 1.18,
+  titleDelay: 0.72,
+  titleDuration: 1.18,
+  contentDelay: 1.34,
+  contentDuration: 0.95,
+  contentStagger: 0.13,
+};
+
+function AnimatedTitle({
+  children,
+  as: Component = "h1",
+  className = "",
+  style,
+  reveal = true,
+}) {
+  const text = String(children);
+
+  return (
+    <Component
+      data-page-title={reveal ? "" : undefined}
+      aria-label={text}
+      className={cx("overflow-hidden", className)}
+      style={style}
+    >
+      <span aria-hidden="true" className="inline-block">
+        {Array.from(text).map((char, index) => (
+          <span
+            key={`${char}-${index}`}
+            className="inline-block overflow-hidden align-baseline"
+          >
+            <span
+              data-title-char={reveal ? "" : undefined}
+              className="inline-block will-change-transform"
+            >
+              {char === " " ? "\u00A0" : char}
+            </span>
+          </span>
+        ))}
+      </span>
+    </Component>
+  );
+}
+
 const fadeUp = {
   hidden: { opacity: 0, y: 8, filter: "blur(8px)" },
   show: {
@@ -109,6 +155,34 @@ const fadeUp = {
 const stagger = {
   hidden: {},
   show: { transition: { staggerChildren: 0.08 } },
+};
+
+const homeReveal = {
+  hidden: { opacity: 0, y: 14, filter: "blur(10px)" },
+  show: (delay = 0) => ({
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    transition: {
+      delay,
+      duration: 0.85,
+      ease: [0.16, 1, 0.3, 1],
+    },
+  }),
+};
+
+const chromeReveal = {
+  hidden: { opacity: 0, y: -6, filter: "blur(6px)" },
+  show: (delay = 0) => ({
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    transition: {
+      delay,
+      duration: 0.48,
+      ease: [0.16, 1, 0.3, 1],
+    },
+  }),
 };
 
 function getCurrentRoute() {
@@ -125,19 +199,19 @@ function useHashRoute() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
-const go = useCallback((id) => {
-  if (typeof window === "undefined") return;
+  const go = useCallback((id) => {
+    if (typeof window === "undefined") return;
 
-  const currentRoute = getCurrentRoute();
+    const currentRoute = getCurrentRoute();
 
-  if (currentRoute === id) {
+    if (currentRoute === id) {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      return;
+    }
+
+    window.location.hash = id === "home" ? "" : id;
     window.scrollTo({ top: 0, behavior: "auto" });
-    return;
-  }
-
-  window.location.hash = id === "home" ? "" : id;
-  window.scrollTo({ top: 0, behavior: "auto" });
-}, []);
+  }, []);
 
   return { route, go };
 }
@@ -239,8 +313,14 @@ function PageShell({ children, pageKey }) {
     setPages((currentPages) => {
       const currentPage = currentPages[currentPages.length - 1];
 
-      if (!currentPage || currentPage.key === pageKey) {
+      if (!currentPage) {
         return currentPages;
+      }
+
+      if (currentPage.key === pageKey) {
+        return currentPages.map((page, index) =>
+          index === currentPages.length - 1 ? { ...page, children } : page,
+        );
       }
 
       return [
@@ -288,42 +368,44 @@ function PageShell({ children, pageKey }) {
       force3D: true,
     });
 
-    const revealItems = gsap.utils.toArray(
-      nextContainer.querySelectorAll("[data-page-reveal]"),
-    );
-    const titleElement = nextContainer.querySelector(
-      "h1[data-page-reveal], [data-page-title]",
-    );
-    const supportingRevealItems = revealItems.filter(
-      (item) => item !== titleElement && !item.contains(titleElement),
-    );
-    const titleChars = splitTitleForTransition(titleElement);
+    const titleChars = nextContainer.querySelectorAll("[data-title-char]");
+    const revealItems = nextContainer.querySelectorAll("[data-page-reveal]");
 
-    gsap.set(revealItems, { opacity: 0, y: 12, filter: "blur(8px)" });
+    gsap.set(titleChars, {
+      yPercent: 112,
+      rotateX: -72,
+      opacity: 1,
+      transformOrigin: "50% 100%",
+      transformPerspective: 900,
+      force3D: true,
+    });
 
-    if (titleElement) {
-      gsap.set(titleElement, { opacity: 1, y: 0, filter: "blur(0px)" });
-    }
-
-    if (titleChars.length) {
-      gsap.set(titleChars, {
-        rotateX: -92,
-        yPercent: 105,
-        transformPerspective: 1000,
-        transformOrigin: "50% 100%",
-        force3D: true,
-      });
-    }
+    gsap.set(revealItems, {
+      opacity: 0,
+      y: 18,
+      filter: "blur(10px)",
+      force3D: true,
+    });
 
     timelineRef.current = gsap.timeline({
       defaults: { ease: "power4.inOut" },
       onComplete: () => {
         gsap.set(nextContainer, {
           clearProps:
-            "clipPath,position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,filter,y,scale",
+            "clipPath,position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,filter,y,scale,rotateX",
+        });
+        gsap.set(titleChars, {
+          clearProps: "transform,opacity,transformOrigin,transformPerspective",
+        });
+        gsap.set(revealItems, { clearProps: "transform,opacity,filter,y" });
+
+        gsap.set(currentContainer, {
+          clearProps:
+            "position,inset,width,height,overflow,zIndex,transformOrigin,transform,opacity,filter,y,scale",
         });
 
         window.scrollTo(0, 0);
+
         setPages([{ key: pageKey, children, status: "current" }]);
 
         requestAnimationFrame(() => {
@@ -336,49 +418,57 @@ function PageShell({ children, pageKey }) {
       .to(
         currentContainer,
         {
-          y: "-18vh",
-          opacity: 0.72,
-          scale: 0.94,
-          duration: 1.55,
+          y: "-30vh",
+          scale: 0.92,
+          duration: PAGE_TRANSITION.oldPageDuration,
           force3D: true,
           ease: "power3.inOut",
         },
         0,
       )
       .to(
+        currentContainer,
+        {
+          opacity: 0.48,
+          duration:
+            PAGE_TRANSITION.oldPageDuration - PAGE_TRANSITION.oldPageHold,
+          ease: "power2.inOut",
+        },
+        PAGE_TRANSITION.oldPageHold,
+      )
+      .to(
         nextContainer,
         {
           clipPath: "inset(0% 0% 0% 0%)",
-          duration: 1.65,
+          duration: PAGE_TRANSITION.coverDuration,
           force3D: true,
           ease: "power3.inOut",
         },
         0,
-      );
-
-    if (titleChars.length) {
-      timelineRef.current.to(
+      )
+      .to(
         titleChars,
         {
-          rotateX: 0,
           yPercent: 0,
-          duration: 1.6,
-          stagger: 0.028,
+          rotateX: 0,
+          duration: PAGE_TRANSITION.titleDuration,
+          stagger: { each: 0.045, from: "start" },
           ease: "expo.out",
+          force3D: true,
         },
-        0.62,
-      );
-    } else if (titleElement) {
-      timelineRef.current.to(
-        titleElement,
+        PAGE_TRANSITION.titleDelay,
+      )
+      .to(
+        revealItems,
         {
           opacity: 1,
           y: 0,
           filter: "blur(0px)",
-          duration: 1.2,
+          duration: PAGE_TRANSITION.contentDuration,
+          stagger: PAGE_TRANSITION.contentStagger,
           ease: "power3.out",
         },
-        0.78,
+        PAGE_TRANSITION.contentDelay,
       );
     }
 
@@ -404,7 +494,7 @@ function PageShell({ children, pageKey }) {
     <div ref={wrapperRef} data-transition="wrapper">
       {pages.map((page) => (
         <div
-          key={page.key}
+          key={`${page.key}-${page.status}`}
           data-transition="container"
           data-transition-status={page.status}
         >
@@ -462,7 +552,7 @@ function AounLogo({ tone = "light", className = "" }) {
   );
 }
 
-function Preloader() {
+function Preloader({ onComplete }) {
   const [done, setDone] = useState(false);
   const [count, setCount] = useState(0);
 
@@ -493,7 +583,7 @@ function Preloader() {
   }, []);
 
   return (
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={onComplete}>
       {!done && (
         <motion.div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-black text-[#d8d8d2]"
@@ -517,21 +607,33 @@ function Preloader() {
   );
 }
 
-function Header({ route, go }) {
+function Header({ route, go, loadReady }) {
+  const revealState = loadReady ? "show" : "hidden";
+
   return (
     <>
-      <header className="fixed left-0 right-0 top-0 z-50 mix-blend-difference">
+      <motion.header
+        initial="hidden"
+        animate={revealState}
+        className="fixed left-0 right-0 top-0 z-50 mix-blend-difference"
+      >
         <div className="flex items-start justify-between px-7 py-7 text-[#f0f0eb]">
-          <button
+          <motion.button
             type="button"
             onClick={() => go("home")}
             aria-label="AOUN Home"
             className="pt-[1px]"
+            variants={chromeReveal}
+            custom={0.82}
           >
             <AounLogo tone="light" className="h-[10px] w-auto" />
-          </button>
+          </motion.button>
 
-          <nav className={cx("flex gap-8 text-[#f0f0eb]", navClass)}>
+          <motion.nav
+            variants={chromeReveal}
+            custom={0.96}
+            className={cx("flex gap-8 text-[#f0f0eb]", navClass)}
+          >
             {NAV.map((item) => (
               <button
                 type="button"
@@ -545,16 +647,16 @@ function Header({ route, go }) {
                 {item.label}
               </button>
             ))}
-          </nav>
+          </motion.nav>
         </div>
-      </header>
+      </motion.header>
 
-      <SocialLinks route={route} />
+      <SocialLinks route={route} loadReady={loadReady} />
     </>
   );
 }
 
-function SocialLinks({ route }) {
+function SocialLinks({ route, loadReady }) {
   const { scrollYProgress } = useScroll();
   const opacity = useTransform(
     scrollYProgress,
@@ -569,29 +671,34 @@ function SocialLinks({ route }) {
 
   return (
     <motion.div
-      style={{ opacity, y }}
+      initial="hidden"
+      animate={loadReady ? "show" : "hidden"}
+      variants={chromeReveal}
+      custom={1.1}
       className={cx(
-        "fixed bottom-7 right-7 z-40 hidden gap-5 text-[#f0f0eb] mix-blend-difference md:flex",
+        "fixed bottom-7 right-7 z-40 hidden text-[#f0f0eb] mix-blend-difference md:block",
         navClass,
       )}
     >
-      <a
-        href="https://instagram.com"
-        target="_blank"
-        rel="noreferrer"
-        className="transition-opacity hover:opacity-50"
-      >
-        INSTAGRAM
-      </a>
-      <span>/</span>
-      <a
-        href="https://linkedin.com"
-        target="_blank"
-        rel="noreferrer"
-        className="transition-opacity hover:opacity-50"
-      >
-        LINKEDIN
-      </a>
+      <motion.div style={{ opacity, y }} className="flex gap-5">
+        <a
+          href="https://instagram.com"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-opacity hover:opacity-50"
+        >
+          INSTAGRAM
+        </a>
+        <span>/</span>
+        <a
+          href="https://linkedin.com"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-opacity hover:opacity-50"
+        >
+          LINKEDIN
+        </a>
+      </motion.div>
     </motion.div>
   );
 }
@@ -635,21 +742,22 @@ function ParallaxMedia({ src, alt = "", className = "" }) {
   );
 }
 
-function Home({ go }) {
+function Home({ go, loadReady }) {
   return (
     <div className="bg-black text-[#d8d8d2]">
       <section className="relative flex min-h-screen items-center justify-center px-7 py-24">
         <motion.div
           initial="hidden"
-          animate="show"
+          animate={loadReady ? "show" : "hidden"}
           variants={stagger}
           className="relative z-10 text-center"
         >
           <motion.h1
             data-page-reveal
-            variants={fadeUp}
+            variants={homeReveal}
+            custom={0}
             className={cx(
-              "mx-auto mb-6 max-w-[15ch] text-[38px] md:text-[58px]",
+              "mx-auto mb-6 max-w-[18ch] text-[38px] sm:max-w-[20ch] md:max-w-[22ch] md:text-[58px]",
               title,
             )}
             style={{ letterSpacing: "0.045em" }}
@@ -659,7 +767,8 @@ function Home({ go }) {
 
           <motion.p
             data-page-reveal
-            variants={fadeUp}
+            variants={homeReveal}
+            custom={0.26}
             className={cx("mx-auto max-w-[34ch] text-[#a6a59f]", small)}
           >
             FOR FOUNDERS AND COMPANIES WHO REFUSE TO STAY UNDERVALUED.
@@ -668,9 +777,10 @@ function Home({ go }) {
 
         <motion.div
           data-page-reveal
-          variants={fadeUp}
+          variants={homeReveal}
+          custom={0.54}
           initial="hidden"
-          animate="show"
+          animate={loadReady ? "show" : "hidden"}
           className="absolute bottom-8 left-7 max-w-[40ch] text-[#8f8e88]"
         >
           <p className={cx(small, "uppercase tracking-[0.12em] leading-[1.38]")}>
@@ -823,7 +933,9 @@ function MethodMinimal() {
         {items.map((item) => (
           <Reveal key={item}>
             <div className="bg-white/[0.035] p-5">
-              <p className={cx(small, "uppercase tracking-[0.12em]")}>{item}</p>
+              <p className={cx(small, "uppercase tracking-[0.12em]")}>
+                {item}
+              </p>
             </div>
           </Reveal>
         ))}
@@ -953,16 +1065,20 @@ function StackGsapCard({ work, index, onSelect }) {
       />
       <div className="absolute inset-0 bg-black/42" />
 
-      <div className="relative flex h-full flex-col justify-between px-5 pb-5 pt-24 text-[#d8d8d2] md:px-8 md:pb-8 md:pt-28">
+      <div className="relative h-full px-5 pb-5 pt-24 text-[#d8d8d2] md:px-8 md:pb-8 md:pt-28">
         <div
           data-stack-reveal
-          className={cx("flex justify-between text-[#aaa9a2]", small, "uppercase")}
+          className={cx(
+            "flex justify-between text-[#aaa9a2]",
+            small,
+            "uppercase",
+          )}
         >
           <span>{work.meta}</span>
           <span>0{index + 1}</span>
         </div>
 
-        <div className="text-left">
+        <div className="absolute left-5 top-[66.666%] max-w-[calc(100%-2.5rem)] text-left md:left-8 md:max-w-[calc(100%-4rem)]">
           <h3
             data-stack-reveal
             className="mb-5 text-[36px] font-thin leading-[0.95] tracking-[0.03em] md:text-[82px]"
@@ -1145,25 +1261,25 @@ function SubPage({ children }) {
 function PageHero({ title, children }) {
   return (
     <section className="flex min-h-screen flex-col justify-between px-7 pb-8 pt-24">
-      <motion.h1
-        data-page-reveal
-        variants={fadeUp}
-        initial="hidden"
-        animate="show"
-        className="text-[44px] font-thin leading-[0.96] tracking-[0.04em] md:text-[90px]"
-      >
-        {title}
-      </motion.h1>
-
-      <motion.div
-        data-page-reveal
-        variants={fadeUp}
-        initial="hidden"
-        animate="show"
-        className="grid gap-8 md:grid-cols-4 md:items-end"
-      >
-        {children}
+      <motion.div variants={fadeUp} initial="hidden" animate="show">
+        <AnimatedTitle className="text-[44px] font-thin leading-[0.96] tracking-[0.04em] md:text-[90px]">
+          {title}
+        </AnimatedTitle>
       </motion.div>
+
+      <div className="grid gap-8 md:grid-cols-4 md:items-end">
+        {React.Children.map(children, (child, index) => (
+          <motion.div
+            data-page-reveal
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            transition={{ delay: index * 0.1 }}
+          >
+            {child}
+          </motion.div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -1176,7 +1292,13 @@ function Build({ go }) {
           The guided brand build.
         </p>
 
-        <p className={cx("max-w-[34ch] text-[#69665f] md:col-start-3", small, "uppercase")}>
+        <p
+          className={cx(
+            "max-w-[34ch] text-[#69665f] md:col-start-3",
+            small,
+            "uppercase",
+          )}
+        >
           FOR COMPANIES, PRODUCTS AND CONCEPTS THAT DO NOT SIMPLY NEED BETTER
           DESIGN. THEY NEED STRONGER EFFECT.
         </p>
@@ -1310,7 +1432,13 @@ function Works({ go }) {
           Not a gallery. Interventions.
         </p>
 
-        <p className={cx("max-w-[34ch] text-[#69665f] md:col-start-3", small, "uppercase")}>
+        <p
+          className={cx(
+            "max-w-[34ch] text-[#69665f] md:col-start-3",
+            small,
+            "uppercase",
+          )}
+        >
           AOUN SHOWS SHIFTS IN PERCEPTION, VALUE AND EFFECT.
         </p>
 
@@ -1335,7 +1463,13 @@ function Studio({ go }) {
           A leading instance.
         </p>
 
-        <p className={cx("max-w-[34ch] text-[#69665f] md:col-start-3", small, "uppercase")}>
+        <p
+          className={cx(
+            "max-w-[34ch] text-[#69665f] md:col-start-3",
+            small,
+            "uppercase",
+          )}
+        >
           FOR VALUE, TASTE AND EFFECT.
         </p>
 
@@ -1391,7 +1525,9 @@ function Apply() {
   const isLast = step === formSteps.length - 1;
 
   const handleNext = () => {
-    if (!isLast) setStep((current) => Math.min(current + 1, formSteps.length - 1));
+    if (!isLast) {
+      setStep((current) => Math.min(current + 1, formSteps.length - 1));
+    }
   };
 
   const handleBack = () => {
@@ -1405,7 +1541,13 @@ function Apply() {
           Show us what you are building.
         </p>
 
-        <p className={cx("max-w-[34ch] text-[#69665f] md:col-start-3", small, "uppercase")}>
+        <p
+          className={cx(
+            "max-w-[34ch] text-[#69665f] md:col-start-3",
+            small,
+            "uppercase",
+          )}
+        >
           NOT WHAT YOU ARE IMAGINING.
         </p>
       </PageHero>
@@ -1435,7 +1577,12 @@ function Apply() {
                 </span>
 
                 {step === formSteps.length - 1 ? (
-                  <select className={cx("w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none", small)}>
+                  <select
+                    className={cx(
+                      "w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none",
+                      small,
+                    )}
+                  >
                     <option>10k–20k</option>
                     <option>20k–40k</option>
                     <option>40k–75k</option>
@@ -1444,10 +1591,18 @@ function Apply() {
                 ) : step > 2 ? (
                   <textarea
                     rows={4}
-                    className={cx("w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none", small)}
+                    className={cx(
+                      "w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none",
+                      small,
+                    )}
                   />
                 ) : (
-                  <input className={cx("w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none", small)} />
+                  <input
+                    className={cx(
+                      "w-full bg-[#c7c3ba] p-5 text-[#2b2a27] outline-none",
+                      small,
+                    )}
+                  />
                 )}
               </label>
             </motion.div>
@@ -1465,7 +1620,10 @@ function Apply() {
 
             <button
               type="button"
-              className={cx("rounded-full bg-[#2b2a27] px-5 py-3 text-[#e8e6df]", micro)}
+              className={cx(
+                "rounded-full bg-[#2b2a27] px-5 py-3 text-[#e8e6df]",
+                micro,
+              )}
               onClick={handleNext}
             >
               {isLast ? "SUBMIT" : "NEXT"}
@@ -1479,6 +1637,8 @@ function Apply() {
 
 export default function AounWebsitePrototype() {
   const { route, go } = useHashRoute();
+  const [loadReady, setLoadReady] = useState(false);
+
   useHeavyScroll(route);
 
   const page = useMemo(() => {
@@ -1492,9 +1652,9 @@ export default function AounWebsitePrototype() {
       case "apply":
         return <Apply />;
       default:
-        return <Home go={go} />;
+        return <Home go={go} loadReady={loadReady} />;
     }
-  }, [route, go]);
+  }, [route, go, loadReady]);
 
   return (
     <div className="min-h-screen bg-black text-black antialiased selection:bg-black selection:text-[#e8e6df]">
@@ -1514,8 +1674,8 @@ export default function AounWebsitePrototype() {
         select option { background: ${PAPER_SOFT}; color: ${PAPER_TEXT}; }
       `}</style>
 
-      <Preloader />
-      <Header route={route} go={go} />
+      <Preloader onComplete={() => setLoadReady(true)} />
+      <Header route={route} go={go} loadReady={loadReady} />
       <PageShell pageKey={route}>{page}</PageShell>
     </div>
   );
